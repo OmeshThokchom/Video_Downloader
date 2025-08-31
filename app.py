@@ -291,81 +291,74 @@ def search_video():
     
     return jsonify(video_info)
 
-@app.route('/api/download', methods=['POST'])
-def download():
+@app.route('/api/get-download-url', methods=['POST'])
+def get_download_url():
+    """Get direct download URL for browser download"""
     data = request.get_json()
     url = data.get('url')
     format_id = data.get('format_id')
-    file_type = data.get('type', 'video')  # 'video' or 'audio'
+    file_type = data.get('type', 'video')
     
     if not all([url, format_id]):
         return jsonify({'error': 'Missing required parameters'}), 400
     
     try:
-        # Get video info first to get the title
+        # Get video info and direct download URL
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if not info:
                 return jsonify({'error': 'Could not get video information'}), 400
             
-            # Create a safe filename from the title
+            # Find the specific format
+            download_url = None
+            filesize = 0
+            
+            if 'formats' in info and info['formats']:
+                for fmt in info['formats']:
+                    if fmt.get('format_id') == format_id:
+                        download_url = fmt.get('url')
+                        filesize = fmt.get('filesize', 0)
+                        break
+            
+            # For audio downloads, use bestaudio format
+            if file_type == 'audio' and not download_url:
+                # Find best audio format
+                for fmt in info['formats']:
+                    if (fmt.get('acodec') != 'none' and 
+                        fmt.get('vcodec') == 'none' and 
+                        fmt.get('ext') in ['mp3', 'm4a']):
+                        download_url = fmt.get('url')
+                        filesize = fmt.get('filesize', 0)
+                        break
+            
+            if not download_url:
+                return jsonify({'error': 'Download URL not found'}), 400
+            
+            # Create filename
             title = info.get('title', 'video')
             safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_title = safe_title[:50]  # Limit length
+            safe_title = safe_title[:50]
             
-            # Determine file extension based on type and format
             if file_type == 'audio':
-                suffix = '.mp3'
-                mimetype = 'audio/mpeg'
+                filename = f"{safe_title}.mp3"
             else:
-                suffix = '.mp4'
-                mimetype = 'video/mp4'
+                filename = f"{safe_title}.mp4"
             
-            # Create temporary file with proper name
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-                output_path = tmp_file.name
-            
-            # Download the file
-            success = download_video(url, format_id, output_path)
-            
-            if success and os.path.exists(output_path):
-                # Get file size
-                file_size = os.path.getsize(output_path)
-                
-                if file_size == 0:
-                    return jsonify({'error': 'Downloaded file is empty'}), 500
-                
-                # Create proper download filename
-                if file_type == 'audio':
-                    download_name = f"{safe_title}.mp3"
-                else:
-                    download_name = f"{safe_title}.mp4"
-                
-                # Clean up function to remove temp file after sending
-                def cleanup():
-                    try:
-                        if os.path.exists(output_path):
-                            os.unlink(output_path)
-                    except:
-                        pass
-                
-                response = send_file(
-                    output_path, 
-                    as_attachment=True, 
-                    download_name=download_name,
-                    mimetype=mimetype
-                )
-                
-                # Add cleanup callback
-                response.call_on_close(cleanup)
-                
-                return response
-            else:
-                return jsonify({'error': 'Download failed'}), 500
+            return jsonify({
+                'download_url': download_url,
+                'filename': filename,
+                'filesize': filesize,
+                'title': title
+            })
             
     except Exception as e:
-        print(f"Download error: {e}")
+        print(f"Error getting download URL: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/download', methods=['POST'])
+def download():
+    """Legacy download endpoint - redirects to get-download-url"""
+    return get_download_url()
 
 @app.route('/api/thumbnail/<path:url>')
 def get_thumbnail(url):

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Video Downloader - Advanced Media Extraction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="static/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-black text-white overflow-x-hidden">
+    <!-- Particle Animation Canvas -->
+    <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+    
+    <!-- Main Content -->
+    <div class="relative z-10 min-h-screen">
+        <!-- Header -->
+        <header class="container mx-auto px-4 py-6">
+            <div class="text-center">
+                <h1 class="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent mb-4">
+                    <i class="fas fa-atom mr-4"></i>Quantum Downloader
+                </h1>
+                <p class="text-xl text-gray-300 mb-8">Advanced Multi-Source Video Extraction System</p>
+            </div>
+        </header>
+
+        <!-- Main Interface -->
+        <main class="container mx-auto px-4 py-8">
+            <!-- URL Input Section -->
+            <div class="max-w-4xl mx-auto mb-12">
+                <div class="bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-cyan-500/30 p-8 shadow-2xl">
+                    <div class="text-center mb-6">
+                        <h2 class="text-3xl font-bold text-cyan-400 mb-2">
+                            <i class="fas fa-link mr-3"></i>Enter Video URL
+                        </h2>
+                        <p class="text-gray-400">Paste any video link from YouTube, Vimeo, or other platforms</p>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <input 
+                            type="url" 
+                            id="videoUrl" 
+                            placeholder="https://www.youtube.com/watch?v=..." 
+                            class="flex-1 bg-gray-800/70 border border-cyan-500/50 rounded-xl px-6 py-4 text-white placeholder-gray-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300"
+                        >
+                        <button 
+                            id="searchBtn" 
+                            class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25"
+                        >
+                            <i class="fas fa-search mr-2"></i>Analyze
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden max-w-4xl mx-auto mb-8">
+                <div class="bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-blue-500/30 p-8 text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                    <p class="text-xl text-cyan-400">Analyzing video source...</p>
+                    <p class="text-gray-400 mt-2">Extracting metadata and available formats</p>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden max-w-4xl mx-auto mb-8">
+                <div class="bg-red-900/50 backdrop-blur-lg rounded-2xl border border-red-500/30 p-8 text-center">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-4"></i>
+                    <p id="errorMessage" class="text-xl text-red-400"></p>
+                </div>
+            </div>
+
+            <!-- Video Results -->
+            <div id="videoResults" class="hidden max-w-6xl mx-auto">
+                <!-- Video Info Card -->
+                <div class="bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-cyan-500/30 p-8 mb-8 shadow-2xl">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Thumbnail -->
+                        <div class="relative group">
+                            <img id="videoThumbnail" src="" alt="Video Thumbnail" class="w-full rounded-xl shadow-2xl group-hover:scale-105 transition-transform duration-300">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-xl"></div>
+                            <div class="absolute bottom-4 left-4">
+                                <span id="videoDuration" class="bg-black/70 px-3 py-1 rounded-lg text-sm"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Video Details -->
+                        <div class="space-y-4">
+                            <h3 id="videoTitle" class="text-2xl font-bold text-white"></h3>
+                            <p id="videoUploader" class="text-gray-400">
+                                <i class="fas fa-user mr-2"></i><span></span>
+                            </p>
+                            <p id="videoViews" class="text-gray-400">
+                                <i class="fas fa-eye mr-2"></i><span></span> views
+                            </p>
+                            <p id="videoDescription" class="text-gray-300 text-sm leading-relaxed"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Options -->
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Video Formats -->
+                    <div class="bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-blue-500/30 p-6 shadow-2xl">
+                        <h3 class="text-2xl font-bold text-blue-400 mb-6 flex items-center">
+                            <i class="fas fa-video mr-3"></i>Video Formats
+                        </h3>
+                        <div id="videoFormats" class="space-y-3">
+                            <!-- Video format options will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Audio Formats -->
+                    <div class="bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-green-500/30 p-6 shadow-2xl">
+                        <h3 class="text-2xl font-bold text-green-400 mb-6 flex items-center">
+                            <i class="fas fa-music mr-3"></i>Audio Formats
+                        </h3>
+                        <div id="audioFormats" class="space-y-3">
+                            <!-- Audio format options will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="container mx-auto px-4 py-8 mt-16">
+            <div class="text-center text-gray-400">
+                <p>&copy; 2024 Quantum Video Downloader. Advanced media extraction technology.</p>
+                <p class="mt-2 text-sm">
+                    <a href="https://github.com/yourusername/quantum-video-downloader" class="text-cyan-400 hover:text-cyan-300">
+                        <i class="fab fa-github mr-1"></i>View on GitHub
+                    </a>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Download Progress Modal -->
+    <div id="downloadModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-gray-900/90 backdrop-blur-lg rounded-2xl border border-cyan-500/30 p-8 max-w-md w-full mx-4">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                <h3 class="text-xl font-bold text-cyan-400 mb-2">Downloading...</h3>
+                <p class="text-gray-400">Please wait while we process your download</p>
+                <div class="mt-4 w-full bg-gray-700 rounded-full h-2">
+                    <div id="downloadProgress" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="downloadStatus" class="text-sm text-gray-400 mt-2">Starting download...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/js/particles.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html>

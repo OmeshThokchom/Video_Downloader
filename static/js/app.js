@@ -210,7 +210,8 @@ class VideoDownloader {
         this.showDownloadModal(format);
         
         try {
-            const response = await fetch('/api/download', {
+            // Get download URL from server
+            const response = await fetch('/api/get-download-url', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -223,18 +224,32 @@ class VideoDownloader {
             });
             
             if (response.ok) {
-                // Create download link
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
+                const data = await response.json();
+                
+                // Create direct download link
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = `downloaded_${type}_${formatId}.${type === 'video' ? 'mp4' : 'mp3'}`;
+                a.href = data.download_url;
+                a.download = data.filename;
+                a.target = '_blank';
+                a.style.display = 'none';
+                
+                // Add to DOM and trigger download
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
                 
-                this.showSuccess('Download completed successfully!');
+                this.showSuccess(`Download started: ${data.filename}`);
+                
+                // Update progress to show completion
+                setTimeout(() => {
+                    const progressBar = document.getElementById('downloadProgress');
+                    const statusText = document.getElementById('downloadStatus');
+                    if (progressBar && statusText) {
+                        progressBar.style.width = '100%';
+                        statusText.textContent = 'Download completed!';
+                    }
+                }, 1000);
+                
             } else {
                 const error = await response.json();
                 this.showError(error.error || 'Download failed');
@@ -243,7 +258,9 @@ class VideoDownloader {
             console.error('Download error:', error);
             this.showError('Download failed. Please try again.');
         } finally {
-            this.hideDownloadModal();
+            setTimeout(() => {
+                this.hideDownloadModal();
+            }, 2000);
         }
     }
     
