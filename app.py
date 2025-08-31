@@ -184,74 +184,116 @@ def filter_formats_by_quality(all_formats):
     
     return filtered_formats
 
-def download_video(url, format_id, output_path):
+def download_video(url, format_id, output_path, file_type='video'):
     """Download video with specified format"""
+    import os
+    import shutil
+    
     try:
-        # Get video info first to get the title
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            if not info:
-                return False
-            
-            # Create a safe filename from the title
-            title = info.get('title', 'video')
-            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_title = safe_title[:50]  # Limit length
-            
-            # Determine if this is an audio download
-            is_audio = format_id.startswith('bestaudio') or 'audio' in format_id.lower()
-            
-            # Set up download options
-            if is_audio:
-                # For audio, we need to use a different approach to ensure MP3 output
-                download_opts = {
-                    'format': 'bestaudio/best',
-                    'outtmpl': output_path.replace('.mp3', '.%(ext)s'),
-                    'quiet': True,
-                    'progress_hooks': [progress_hook],
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                        'preferredquality': '192',
-                    }],
-                }
-            else:
-                download_opts = {
-                    'format': format_id,
-                    'outtmpl': output_path,
-                    'quiet': True,
-                    'progress_hooks': [progress_hook],
-                }
-            
+        print(f"Starting download: URL={url}, Format={format_id}, Output={output_path}, Type={file_type}")
+        
+        # Determine if this is an audio download based on file_type parameter
+        is_audio = file_type == 'audio'
+        print(f"Is audio download: {is_audio}")
+        
+        # Clear any existing file to avoid cache issues
+        if os.path.exists(output_path):
+            os.remove(output_path)
+            print(f"Removed existing file: {output_path}")
+        
+        # Clear yt-dlp cache to prevent download issues
+        clear_ytdlp_cache()
+        
+        # Set up download options
+        if is_audio:
+            # For audio downloads, use bestaudio format and convert to MP3
+            # Remove .mp3 extension for audio downloads as yt-dlp will add it after conversion
+            base_path = output_path.replace('.mp3', '')
+            download_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': base_path,
+                'quiet': False,  # Enable verbose output for debugging
+                'progress_hooks': [progress_hook],
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'noplaylist': True,
+                'ignoreerrors': False,
+            }
+            print(f"Audio download opts: {download_opts}")
+        else:
+            # For video downloads, use the specific format
+            download_opts = {
+                'format': format_id,
+                'outtmpl': output_path,
+                'quiet': False,  # Enable verbose output for debugging
+                'progress_hooks': [progress_hook],
+                'noplaylist': True,
+                'ignoreerrors': False,
+                'nooverwrites': False,  # Force overwrite
+            }
+            print(f"Video download opts: {download_opts}")
+        
+        # Create a new YoutubeDL instance with the download options
+        with yt_dlp.YoutubeDL(download_opts) as ydl:
+            print("Starting yt-dlp download...")
             # Download the file
             ydl.download([url])
-            
-            # For audio downloads, find the converted MP3 file
-            if is_audio:
-                import glob
-                # Look for the MP3 file that was created
-                mp3_files = glob.glob(output_path.replace('.mp3', '*.mp3'))
-                if mp3_files:
-                    # Move the MP3 file to the expected location
-                    import shutil
-                    shutil.move(mp3_files[0], output_path)
-            
-            # Check if file was downloaded successfully
-            if os.path.exists(output_path):
-                file_size = os.path.getsize(output_path)
-                if file_size > 0:
-                    print(f"Successfully downloaded: {output_path} ({file_size} bytes)")
-                    return True
-                else:
-                    print(f"Downloaded file is empty: {output_path}")
-                    return False
+            print("yt-dlp download completed")
+        
+        # For audio downloads, check for the converted MP3 file
+        if is_audio:
+            # The actual file will have .mp3 extension added by yt-dlp
+            actual_path = base_path + '.mp3'
+            print(f"Checking for converted MP3 file: {actual_path}")
+            if os.path.exists(actual_path):
+                print(f"Found converted MP3 file, moving to: {output_path}")
+                # Move it to the expected location
+                shutil.move(actual_path, output_path)
             else:
-                print(f"Downloaded file not found: {output_path}")
+                print(f"Converted MP3 file not found at: {actual_path}")
+        
+        # Check if file was downloaded successfully
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            print(f"File exists: {output_path}, Size: {file_size} bytes")
+            if file_size > 0:
+                print(f"Successfully downloaded: {output_path} ({file_size} bytes)")
+                return True
+            else:
+                print(f"Downloaded file is empty: {output_path}")
                 return False
-            
+        else:
+            print(f"Downloaded file not found: {output_path}")
+            # List files in the directory for debugging
+            dir_path = os.path.dirname(output_path)
+            if os.path.exists(dir_path):
+                files = os.listdir(dir_path)
+                print(f"Files in directory {dir_path}: {files}")
+            return False
+        
     except Exception as e:
         print(f"Download error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
+
+def clear_ytdlp_cache():
+    """Clear yt-dlp cache to prevent download issues"""
+    import os
+    import shutil
+    from pathlib import Path
+    
+    try:
+        # Get yt-dlp cache directory
+        cache_dir = Path.home() / '.cache' / 'yt-dlp'
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
+            print(f"Cleared yt-dlp cache: {cache_dir}")
+    except Exception as e:
+        print(f"Could not clear cache: {e}")
 
 def progress_hook(d):
     """Progress hook for yt-dlp to track download progress"""
@@ -291,9 +333,9 @@ def search_video():
     
     return jsonify(video_info)
 
-@app.route('/api/get-download-url', methods=['POST'])
-def get_download_url():
-    """Get direct download URL for browser download"""
+@app.route('/api/download', methods=['POST'])
+def download():
+    """Download video/audio file through server"""
     data = request.get_json()
     url = data.get('url')
     format_id = data.get('format_id')
@@ -303,62 +345,70 @@ def get_download_url():
         return jsonify({'error': 'Missing required parameters'}), 400
     
     try:
-        # Get video info and direct download URL
+        # Get video info first to get the title
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if not info:
                 return jsonify({'error': 'Could not get video information'}), 400
             
-            # Find the specific format
-            download_url = None
-            filesize = 0
-            
-            if 'formats' in info and info['formats']:
-                for fmt in info['formats']:
-                    if fmt.get('format_id') == format_id:
-                        download_url = fmt.get('url')
-                        filesize = fmt.get('filesize', 0)
-                        break
-            
-            # For audio downloads, use bestaudio format
-            if file_type == 'audio' and not download_url:
-                # Find best audio format
-                for fmt in info['formats']:
-                    if (fmt.get('acodec') != 'none' and 
-                        fmt.get('vcodec') == 'none' and 
-                        fmt.get('ext') in ['mp3', 'm4a']):
-                        download_url = fmt.get('url')
-                        filesize = fmt.get('filesize', 0)
-                        break
-            
-            if not download_url:
-                return jsonify({'error': 'Download URL not found'}), 400
-            
-            # Create filename
+            # Create a safe filename from the title
             title = info.get('title', 'video')
             safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_title = safe_title[:50]
+            safe_title = safe_title[:50]  # Limit length
             
+            # Determine file extension based on type and format
             if file_type == 'audio':
-                filename = f"{safe_title}.mp3"
+                suffix = '.mp3'
+                mimetype = 'audio/mpeg'
             else:
-                filename = f"{safe_title}.mp4"
+                suffix = '.mp4'
+                mimetype = 'video/mp4'
             
-            return jsonify({
-                'download_url': download_url,
-                'filename': filename,
-                'filesize': filesize,
-                'title': title
-            })
+            # Create temporary file with proper name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+                output_path = tmp_file.name
+            
+            # Download the file
+            success = download_video(url, format_id, output_path, file_type)
+            
+            if success and os.path.exists(output_path):
+                # Get file size
+                file_size = os.path.getsize(output_path)
+                
+                if file_size == 0:
+                    return jsonify({'error': 'Downloaded file is empty'}), 500
+                
+                # Create proper download filename
+                if file_type == 'audio':
+                    download_name = f"{safe_title}.mp3"
+                else:
+                    download_name = f"{safe_title}.mp4"
+                
+                # Clean up function to remove temp file after sending
+                def cleanup():
+                    try:
+                        if os.path.exists(output_path):
+                            os.unlink(output_path)
+                    except:
+                        pass
+                
+                response = send_file(
+                    output_path, 
+                    as_attachment=True, 
+                    download_name=download_name,
+                    mimetype=mimetype
+                )
+                
+                # Add cleanup callback
+                response.call_on_close(cleanup)
+                
+                return response
+            else:
+                return jsonify({'error': 'Download failed'}), 500
             
     except Exception as e:
-        print(f"Error getting download URL: {e}")
+        print(f"Download error: {e}")
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/download', methods=['POST'])
-def download():
-    """Legacy download endpoint - redirects to get-download-url"""
-    return get_download_url()
 
 @app.route('/api/thumbnail/<path:url>')
 def get_thumbnail(url):

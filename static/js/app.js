@@ -210,8 +210,8 @@ class VideoDownloader {
         this.showDownloadModal(format);
         
         try {
-            // Get download URL from server
-            const response = await fetch('/api/get-download-url', {
+            // Request download from server
+            const response = await fetch('/api/download', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -224,13 +224,25 @@ class VideoDownloader {
             });
             
             if (response.ok) {
-                const data = await response.json();
+                // Get the file as blob
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
                 
-                // Create direct download link
+                // Create download link
                 const a = document.createElement('a');
-                a.href = data.download_url;
-                a.download = data.filename;
-                a.target = '_blank';
+                a.href = url;
+                
+                // Get filename from response headers or use default
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'download';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                a.download = filename;
                 a.style.display = 'none';
                 
                 // Add to DOM and trigger download
@@ -238,7 +250,10 @@ class VideoDownloader {
                 a.click();
                 document.body.removeChild(a);
                 
-                this.showSuccess(`Download started: ${data.filename}`);
+                // Clean up the blob URL
+                window.URL.revokeObjectURL(url);
+                
+                this.showSuccess(`Download completed: ${filename}`);
                 
                 // Update progress to show completion
                 setTimeout(() => {
