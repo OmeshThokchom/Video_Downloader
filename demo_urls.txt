@@ -1,0 +1,28 @@
+# Demo Video URLs for Testing Quantum Video Downloader
+# These are popular videos you can use to test the application
+
+# YouTube Videos
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+https://www.youtube.com/watch?v=jNQXAC9IVRw
+https://www.youtube.com/watch?v=kJQP7kiw5Fk
+
+# Vimeo Videos
+https://vimeo.com/148751763
+https://vimeo.com/1084537
+
+# Dailymotion Videos
+https://www.dailymotion.com/video/x7tgd7g
+
+# Educational Content
+https://www.youtube.com/watch?v=9bZkp7q19f0
+https://www.youtube.com/watch?v=ZZ5LpwO-An4
+
+# Music Videos
+https://www.youtube.com/watch?v=ZZ5LpwO-An4
+https://www.youtube.com/watch?v=9bZkp7q19f0
+
+# Short Videos
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+# Note: These URLs are for testing purposes only.
+# Make sure to respect copyright and terms of service when downloading content.
