@@ -82,6 +82,41 @@ Video_Downloader/
 - yt-dlp (required for video downloading)
 - Modern web browser with JavaScript enabled
 
+## 🚀 Quick Start
+
+### Option 1: Local Development (Full Functionality)
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/Video_Downloader.git
+   cd Video_Downloader
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run the application:**
+   ```bash
+   python3 app.py
+   ```
+
+4. **Open your browser:**
+   Navigate to `http://localhost:5000`
+
+### Option 2: GitHub Pages (Demo Mode)
+
+1. **Deploy to GitHub Pages:**
+   - Push your code to GitHub
+   - Enable GitHub Pages in repository settings
+   - Access at `https://yourusername.github.io/Video_Downloader/`
+
+2. **For detailed deployment instructions:**
+   See [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md)
+
+⚠️ **Note:** GitHub Pages runs in demo mode (no actual downloads) due to static hosting limitations.
+
 ### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/yourusername/quantum-video-downloader.git
