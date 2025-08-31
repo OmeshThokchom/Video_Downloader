@@ -167,6 +167,7 @@ class VideoDownloader {
                         <div>
                             <h4 class="font-semibold text-white">${formatInfo.quality}</h4>
                             <p class="text-sm text-gray-400">${format.ext.toUpperCase()} • ${fileSize}</p>
+                            ${format.quality_display ? `<p class="text-xs text-gray-500">${format.quality_display}</p>` : ''}
                         </div>
                     </div>
                 </div>
@@ -180,7 +181,7 @@ class VideoDownloader {
         const downloadBtn = div.querySelector('.download-btn');
         downloadBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            this.downloadFormat(format.format_id, type);
+            this.downloadFormat(format.format_id, type, format);
         });
         
         return div;
@@ -189,24 +190,24 @@ class VideoDownloader {
     getFormatInfo(format, type) {
         if (type === 'video') {
             return {
-                quality: format.resolution || 'Unknown Quality',
+                quality: format.quality_display || format.resolution || 'Unknown Quality',
                 info: `${format.ext.toUpperCase()} format`
             };
         } else {
             return {
-                quality: format.abr ? `${format.abr}kbps` : 'Unknown Quality',
+                quality: format.quality_display || (format.abr ? `${format.abr}kbps` : 'Unknown Quality'),
                 info: `${format.ext.toUpperCase()} audio`
             };
         }
     }
     
-    async downloadFormat(formatId, type) {
+    async downloadFormat(formatId, type, format) {
         if (!this.currentUrl || !formatId) {
             this.showError('Invalid download parameters');
             return;
         }
         
-        this.showDownloadModal();
+        this.showDownloadModal(format);
         
         try {
             const response = await fetch('/api/download', {
@@ -268,7 +269,7 @@ class VideoDownloader {
     }
     
     formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
+        if (!bytes || bytes === 0) return 'Unknown size';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -306,8 +307,27 @@ class VideoDownloader {
         this.elements.videoResults.classList.add('hidden');
     }
     
-    showDownloadModal() {
+    showDownloadModal(format) {
         this.elements.downloadModal.classList.remove('hidden');
+        
+        // Update modal content with format info
+        const modalContent = this.elements.downloadModal.querySelector('.text-center');
+        if (format) {
+            const fileSize = format.filesize ? this.formatFileSize(format.filesize) : 'Unknown size';
+            const quality = format.quality_display || format.resolution || 'Unknown Quality';
+            
+            modalContent.innerHTML = `
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4"></div>
+                <h3 class="text-xl font-bold text-cyan-400 mb-2">Downloading...</h3>
+                <p class="text-gray-400 mb-2">${quality}</p>
+                <p class="text-sm text-gray-500 mb-4">File size: ${fileSize}</p>
+                <div class="w-full bg-gray-700 rounded-full h-2 mb-2">
+                    <div id="downloadProgress" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="downloadStatus" class="text-sm text-gray-400">Starting download...</p>
+            `;
+        }
+        
         this.simulateDownloadProgress();
     }
     
@@ -318,15 +338,38 @@ class VideoDownloader {
     
     simulateDownloadProgress() {
         let progress = 0;
+        const progressBar = document.getElementById('downloadProgress');
+        const statusText = document.getElementById('downloadStatus');
+        
+        if (!progressBar || !statusText) return;
+        
         const interval = setInterval(() => {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            this.elements.downloadProgress.style.width = progress + '%';
+            progress += Math.random() * 8 + 2; // More realistic progress
+            if (progress > 95) progress = 95;
             
-            if (progress >= 90) {
-                clearInterval(interval);
+            progressBar.style.width = progress + '%';
+            
+            // Update status text
+            if (progress < 25) {
+                statusText.textContent = 'Connecting to server...';
+            } else if (progress < 50) {
+                statusText.textContent = 'Downloading video data...';
+            } else if (progress < 75) {
+                statusText.textContent = 'Processing video stream...';
+            } else if (progress < 95) {
+                statusText.textContent = 'Finalizing download...';
+            } else {
+                statusText.textContent = 'Almost done...';
             }
-        }, 200);
+            
+            if (progress >= 95) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    progressBar.style.width = '100%';
+                    statusText.textContent = 'Download completed!';
+                }, 500);
+            }
+        }, 300);
     }
     
     showSuccess(message) {

@@ -71,8 +71,8 @@ function extractVideoInfo($url) {
         return ['error' => 'Invalid video information received'];
     }
     
-    // Process formats
-    $formats = [];
+    // Process formats and filter by quality
+    $allFormats = [];
     $audioFormats = [];
     
     if (isset($videoInfo['formats'])) {
@@ -82,21 +82,33 @@ function extractVideoInfo($url) {
                 'ext' => $format['ext'] ?? '',
                 'filesize' => $format['filesize'] ?? 0,
                 'url' => $format['url'] ?? '',
+                'height' => $format['height'] ?? 0,
             ];
             
             // Video formats
             if (in_array($format['ext'] ?? '', ['mp4', 'webm', 'mkv'])) {
                 $formatInfo['resolution'] = $format['resolution'] ?? 'N/A';
                 $formatInfo['quality'] = $format['quality'] ?? 0;
-                $formats[] = $formatInfo;
+                $allFormats[] = $formatInfo;
             }
             
             // Audio formats
-            if (in_array($format['ext'] ?? '', ['mp3', 'm4a', 'webm'])) {
+            if (in_array($format['ext'] ?? '', ['mp3', 'm4a', 'webm']) && isset($format['filesize'])) {
                 $formatInfo['abr'] = $format['abr'] ?? 0;
                 $audioFormats[] = $formatInfo;
             }
         }
+    }
+    
+    // Filter formats by quality levels
+    $formats = filterFormatsByQuality($allFormats);
+    
+    // Limit audio formats to best quality
+    if (!empty($audioFormats)) {
+        usort($audioFormats, function($a, $b) {
+            return ($b['abr'] ?? 0) - ($a['abr'] ?? 0);
+        });
+        $audioFormats = [array_slice($audioFormats, 0, 1)[0]];
     }
     
     return [
@@ -109,6 +121,74 @@ function extractVideoInfo($url) {
         'view_count' => $videoInfo['view_count'] ?? 0,
         'description' => substr($videoInfo['description'] ?? '', 0, 200) . '...'
     ];
+}
+
+function filterFormatsByQuality($allFormats) {
+    if (empty($allFormats)) {
+        return [];
+    }
+    
+    // Filter out formats with null or invalid height values
+    $validFormats = [];
+    foreach ($allFormats as $fmt) {
+        $height = $fmt['height'] ?? null;
+        if ($height !== null && is_numeric($height) && $height > 0) {
+            $validFormats[] = $fmt;
+        }
+    }
+    
+    if (empty($validFormats)) {
+        // If no valid formats, return original formats with default labels
+        foreach ($allFormats as &$fmt) {
+            $fmt['quality_label'] = 'Available';
+            $fmt['quality_display'] = 'Format (' . strtoupper($fmt['ext'] ?? 'Unknown') . ')';
+        }
+        return $allFormats;
+    }
+    
+    // Sort by height (quality)
+    usort($validFormats, function($a, $b) {
+        return ($a['height'] ?? 0) - ($b['height'] ?? 0);
+    });
+    
+    // Define quality levels
+    $qualityLevels = [
+        'Low' => ['min_height' => 0, 'max_height' => 480, 'label' => 'Low Quality (480p)'],
+        'Standard' => ['min_height' => 481, 'max_height' => 720, 'label' => 'Standard Quality (720p)'],
+        'High' => ['min_height' => 721, 'max_height' => PHP_INT_MAX, 'label' => 'High Quality (1080p+)']
+    ];
+    
+    $filteredFormats = [];
+    
+    foreach ($qualityLevels as $qualityName => $qualityRange) {
+        // Find suitable formats for this quality level
+        $suitableFormats = array_filter($validFormats, function($fmt) use ($qualityRange) {
+            $height = $fmt['height'] ?? 0;
+            return $height >= $qualityRange['min_height'] && $height <= $qualityRange['max_height'];
+        });
+        
+        if (!empty($suitableFormats)) {
+            // Get the best format for this quality level
+            usort($suitableFormats, function($a, $b) {
+                return ($b['height'] ?? 0) - ($a['height'] ?? 0);
+            });
+            
+            $bestFormat = $suitableFormats[0];
+            $bestFormat['quality_label'] = $qualityName;
+            $bestFormat['quality_display'] = $qualityRange['label'];
+            $filteredFormats[] = $bestFormat;
+        }
+    }
+    
+    // If no formats found, return the best available
+    if (empty($filteredFormats) && !empty($validFormats)) {
+        $bestFormat = end($validFormats);
+        $bestFormat['quality_label'] = 'Best Available';
+        $bestFormat['quality_display'] = 'Best Quality (' . ($bestFormat['height'] ?? 'Unknown') . 'p)';
+        $filteredFormats[] = $bestFormat;
+    }
+    
+    return $filteredFormats;
 }
 
 function downloadVideo($url, $formatId) {
